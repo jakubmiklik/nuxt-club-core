@@ -1,29 +1,64 @@
 /**
- * nuxt-club-core - Typový systém pro autentizaci a autorizaci (RBAC)
+ * nuxt-club-core - Typový systém pro autentizaci a autorizaci (Hybridní RBAC model)
  */
 
-export type UserRole = 'admin' | 'coach' | 'member' | 'parent'
+/**
+ * Globální základní role vestavěné v jádru layeru
+ */
+export type BaseRole = 'admin' | 'user'
 
+/**
+ * Prázdné rozhraní určené pro TypeScript Declaration Merging v hostitelské aplikaci.
+ * Příklad rozšíření v hostitelské aplikaci (např. Judo klub):
+ * ```ts
+ * declare module 'nuxt-club-core/types/auth' {
+ *   interface CustomRoles {
+ *     coach: true
+ *     member: true
+ *     parent: true
+ *     referee: true
+ *   }
+ * }
+ * ```
+ */
+export interface CustomRoles {}
+
+/**
+ * Výsledná platná role uživatele v aplikaci (základní role + jakékoliv custom role)
+ */
+export type AppRole = BaseRole | keyof CustomRoles
+
+/**
+ * Úroveň přístupu pro UI komponenty, navigační prvky a middleware
+ */
+export type AccessLevel = AppRole | 'public'
+
+/**
+ * Reprezentace uživatele v klubovém systému
+ */
 export interface ClubUser {
   id: string | number
   email: string
   name: string
-  role: UserRole
+  role: AppRole
   avatar?: string
   createdAt?: string | Date
 }
 
+/**
+ * Interní reprezentace uživatele z databáze obsahující hash hesla
+ */
 export interface AuthDatabaseUser extends ClubUser {
   passwordHash?: string
 }
 
-// Rozšíření typů pro nuxt-auth-utils
+// Rozšíření typů pro nuxt-auth-utils session
 declare module '#auth-utils' {
   interface User {
     id: string | number
     email: string
     name: string
-    role: UserRole
+    role: AppRole
     avatar?: string
   }
 
@@ -64,7 +99,7 @@ declare module 'nitropack' {
         email: string
         name: string
         passwordHash: string
-        role?: UserRole
+        role?: AppRole
       },
       result: { user: ClubUser | null }
     ) => void | Promise<void>
@@ -91,8 +126,8 @@ declare module '#app' {
     /**
      * Vyžadovaná role nebo pole rolí pro přístup na stránku
      */
-    role?: UserRole | UserRole[]
-    roles?: UserRole[]
+    role?: AppRole | AppRole[]
+    roles?: AppRole[]
     /**
      * Volitelné přepsání URL pro přesměrování při neautorizovaném přístupu
      */
@@ -102,8 +137,8 @@ declare module '#app' {
 
 declare module 'vue-router' {
   interface RouteMeta {
-    role?: UserRole | UserRole[]
-    roles?: UserRole[]
+    role?: AppRole | AppRole[]
+    roles?: AppRole[]
     unauthorizedRedirect?: string
   }
 }

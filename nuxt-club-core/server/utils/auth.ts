@@ -1,5 +1,5 @@
 import type { H3Event } from 'h3'
-import type { UserRole, ClubUser, AuthDatabaseUser } from '../../types/auth'
+import type { AppRole, ClubUser, AuthDatabaseUser } from '../../types/auth'
 
 /**
  * Získá aktuálně přihlášeného uživatele ze šifrované session.
@@ -21,23 +21,32 @@ export async function requireUser(event: H3Event): Promise<ClubUser> {
 
 /**
  * Ověří, zda má přihlášený uživatel jednu z povolených rolí (RBAC).
- * Pokud není přihlášen, vrací 401. Pokud nemá dostatečnou roli, vrací 403 Forbidden.
+ * Pravidla:
+ * 1. Pokud uživatel není přihlášen, vyvolá 401 Unauthorized.
+ * 2. Pokud má uživatel roli 'admin', má přístup automaticky povolen (superadmin pass).
+ * 3. Pokud role neodpovídá povoleným rolím, vyvolá 403 Forbidden.
  *
  * @param event H3Event requestu
- * @param allowedRoles Jedna nebo více rolí ('admin' | 'coach' | 'member' | 'parent')
+ * @param allowedRoles Jedna nebo více rolí (AppRole)
  */
 export async function requireRole(
   event: H3Event,
-  allowedRoles: UserRole | UserRole[]
+  allowedRoles: AppRole | AppRole[]
 ): Promise<ClubUser> {
   const user = await requireUser(event)
+
+  // Uživatel s rolí admin má automaticky přístup ke všem chráněným zdrojům
+  if (user.role === 'admin') {
+    return user
+  }
+
   const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles]
 
   if (!roles.includes(user.role)) {
     throw createError({
       statusCode: 403,
       statusMessage: 'Forbidden',
-      message: `Nedostatečná oprávnění. Vyžadována role: ${roles.join(' nebo ')}, vaše role: ${user.role}.`
+      message: `Nedostatečná oprávnění. Vyžadována role: ${roles.join(' nebo ')}, vaše role: ${String(user.role)}.`
     })
   }
 
@@ -78,12 +87,15 @@ export async function createUser(data: {
   email: string
   name: string
   passwordHash: string
-  role?: UserRole
+  role?: AppRole
 }): Promise<ClubUser> {
   const nitroApp = useNitroApp()
   const result: { user: ClubUser | null } = { user: null }
 
-  await nitroApp.hooks.callHook('auth:create-user', data, result)
+  await nitroApp.hooks.callHook('auth:create-user', {
+    ...data,
+    role: data.role || 'user'
+  }, result)
 
   if (!result.user) {
     throw createError({
@@ -128,12 +140,17 @@ export async function findOrCreateOAuthUser(data: {
     }
   }
 
-  // Pokud neexistuje, zkusíme vytvořit uživatele s prázdným/náhodným heslem
+  // Pokud neexistuje, zkusíme vytvořit uživatele s náhodným heslem a výchozí rolí 'user'
   const randomPasswordHash = await hashUserPassword(crypto.randomUUID())
   return await createUser({
     email: data.email,
     name: data.name,
     passwordHash: randomPasswordHash,
-    role: 'member'
+    role: 'user'
   })
 }
+
+/**
+ * Export aliasu pro OAuth Google event handler odpovídající specifikaci
+ */
+export const oauthGoogleEventHandler = defineOAuthGoogleEventHandler

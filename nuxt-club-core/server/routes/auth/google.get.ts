@@ -1,7 +1,7 @@
 import { findOrCreateOAuthUser } from '../../utils/auth'
 
 export default defineOAuthGoogleEventHandler({
-  async onSuccess(event, { user: googleUser, tokens }) {
+  async onSuccess(event, { user: googleUser, tokens: _tokens }) {
     // googleUser obsahuje: { sub, name, given_name, family_name, picture, email, email_verified }
     if (!googleUser.email) {
       throw createError({
@@ -26,7 +26,7 @@ export default defineOAuthGoogleEventHandler({
         id: user.id,
         email: user.email,
         name: user.name,
-        role: user.role || 'member',
+        role: user.role || 'user',
         avatar: user.avatar || googleUser.picture
       },
       loggedInAt: Date.now()

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ClubUser, UserRole } from '../../types/auth'
+import type { ClubUser, AppRole } from '../../types/auth'
 
 const props = withDefaults(
   defineProps<{
@@ -8,7 +8,7 @@ const props = withDefaults(
     subtitle?: string
     loginUrl?: string
     allowRoleSelection?: boolean
-    defaultRole?: UserRole
+    defaultRole?: AppRole
   }>(),
   {
     redirectTo: '/',
@@ -16,13 +16,13 @@ const props = withDefaults(
     subtitle: 'Vytvořte si účet v klubovém systému',
     loginUrl: '/login',
     allowRoleSelection: false,
-    defaultRole: 'member'
+    defaultRole: 'user'
   }
 )
 
 const emit = defineEmits<{
-  (e: 'success', user: ClubUser): void
-  (e: 'error', error: Error): void
+  success: [user: ClubUser]
+  error: [error: unknown]
 }>()
 
 const { fetch: refreshSession } = useUserSession()
@@ -85,17 +85,28 @@ async function handleRegister() {
     // Přesměrujeme uživatele
     await navigateTo(props.redirectTo)
   } catch (err: any) {
-    const data = err?.data
-    if (data?.data?.errors && Array.isArray(data.data.errors)) {
+    const errData = err?.data
+    const flattenedData = errData?.data || errData
+
+    // Mapování chyb z result.error.flatten()
+    if (flattenedData?.fieldErrors) {
       const map: Record<string, string> = {}
-      for (const item of data.data.errors) {
+      for (const [field, messages] of Object.entries(flattenedData.fieldErrors)) {
+        if (Array.isArray(messages) && messages.length > 0) {
+          map[field] = messages[0] as string
+        }
+      }
+      fieldErrors.value = map
+    } else if (Array.isArray(flattenedData?.errors)) {
+      const map: Record<string, string> = {}
+      for (const item of flattenedData.errors) {
         map[item.field] = item.message
       }
       fieldErrors.value = map
     }
 
     errorMessage.value =
-      data?.message ||
+      errData?.message ||
       err?.message ||
       'Registrace se nezdařila. Zkontrolujte prosím zadané údaje.'
 
@@ -227,6 +238,7 @@ async function handleRegister() {
             v-model="form.role"
             class="mt-1.5 block w-full rounded-xl border border-slate-300 bg-white py-2.5 px-3 text-sm text-slate-900 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
           >
+            <option value="user">Uživatel / Člen</option>
             <option value="member">Člen oddílu (sportovec)</option>
             <option value="parent">Rodič sportovce</option>
             <option value="coach">Trenér</option>

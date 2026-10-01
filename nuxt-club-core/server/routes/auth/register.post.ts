@@ -1,6 +1,6 @@
 import { registerSchema, readValidatedBodyStrict } from '../../utils/validation'
 import { findUserByEmail, createUser } from '../../utils/auth'
-import { hashUserPassword } from '../../utils/password'
+import type { AppRole } from '../../../types/auth'
 
 export default defineEventHandler(async (event) => {
   // 1. Zvalidujeme data registračního formuláře
@@ -16,15 +16,15 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // 3. Bezpečně zahashujeme heslo (využívá vestavěný Scrypt z nuxt-auth-utils)
-  const passwordHash = await hashUserPassword(input.password)
+  // 3. Bezpečně zahashujeme heslo pomocí hashPassword z nuxt-auth-utils
+  const passwordHash = await hashPassword(input.password)
 
   // 4. Předáme vytvoření uživatele databázovému hooku hostitelské aplikace
   const createdUser = await createUser({
     email: input.email,
     name: input.name,
     passwordHash,
-    role: input.role || 'member'
+    role: (input.role as AppRole) || 'user'
   })
 
   // 5. Připravíme data pro session

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { UserRole } from '../../types/auth'
+import type { AppRole } from '../../types/auth'
 
 const props = withDefaults(
   defineProps<{
@@ -17,16 +17,26 @@ const isOpen = ref(false)
 const isLoggingOut = ref(false)
 const menuRef = ref<HTMLElement | null>(null)
 
-// Mapování rolí na české názvy a styly odznaků (badges)
-const roleConfig: Record<
-  UserRole,
-  { label: string; badgeClass: string; dotClass: string }
-> = {
+// Typ pro konfiguraci zobrazení role (badge a popisek)
+interface RoleBadgeStyle {
+  label: string
+  badgeClass: string
+  dotClass: string
+}
+
+// Mapování známých základních i běžných klubových rolí na styly odznaků
+const knownRoleConfig: Record<string, RoleBadgeStyle> = {
   admin: {
     label: 'Správce',
     badgeClass:
       'bg-purple-50 text-purple-700 ring-1 ring-inset ring-purple-600/20 dark:bg-purple-950/40 dark:text-purple-300 dark:ring-purple-500/30',
     dotClass: 'bg-purple-500'
+  },
+  user: {
+    label: 'Člen',
+    badgeClass:
+      'bg-slate-50 text-slate-700 ring-1 ring-inset ring-slate-600/20 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-500/30',
+    dotClass: 'bg-slate-500'
   },
   coach: {
     label: 'Trenér',
@@ -48,9 +58,21 @@ const roleConfig: Record<
   }
 }
 
-const currentRoleInfo = computed(() => {
-  const role = (user.value?.role as UserRole) || 'member'
-  return roleConfig[role] || roleConfig.member
+// Dynamické určení stylu odznaku pro jakoukoliv AppRole včetně vlastních CustomRoles
+const currentRoleInfo = computed<RoleBadgeStyle>(() => {
+  const role = (user.value?.role as string) || 'user'
+  if (knownRoleConfig[role]) {
+    return knownRoleConfig[role]
+  }
+
+  // Graceful fallback pro libovolnou custom roli definovanou v hostitelské aplikaci
+  const formattedLabel = role.charAt(0).toUpperCase() + role.slice(1)
+  return {
+    label: formattedLabel,
+    badgeClass:
+      'bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-600/20 dark:bg-indigo-950/40 dark:text-indigo-300 dark:ring-indigo-500/30',
+    dotClass: 'bg-indigo-500'
+  }
 })
 
 // Iniciály uživatele pro avatar fallback

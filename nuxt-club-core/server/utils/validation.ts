@@ -1,5 +1,5 @@
 import type { H3Event } from 'h3'
-import { z } from 'zod'
+import { z, type ZodSchema } from 'zod'
 
 /**
  * Validační schéma pro přihlášení e-mailem a heslem
@@ -41,9 +41,9 @@ export const registerSchema = z
       .string({ required_error: 'Potvrzení hesla je povinné' })
       .min(8, 'Potvrzení hesla musí mít alespoň 8 znaků'),
     role: z
-      .enum(['admin', 'coach', 'member', 'parent'] as const)
+      .string()
       .optional()
-      .default('member')
+      .default('user')
   })
   .refine((data) => data.password === data.passwordConfirm, {
     message: 'Zadaná hesla se neshodují',
@@ -53,12 +53,12 @@ export const registerSchema = z
 export type RegisterInput = z.infer<typeof registerSchema>
 
 /**
- * Helper pro striktní načtení a validaci těla požadavku (H3Event) pomocí Zod schématu.
- * Při nevalidním vstupu vyhazuje strukturovanou HTTP 400 chybu s přehledným seznamem chyb.
+ * Bezpečně zvaliduje tělo požadavku (H3Event) pomocí Zod schématu.
+ * Při nevalidních datech vyhodí formátovanou chybu 400 s detaily z result.error.flatten().
  */
 export async function readValidatedBodyStrict<T>(
   event: H3Event,
-  schema: z.ZodType<T>
+  schema: ZodSchema<T>
 ): Promise<T> {
   let body: unknown
   try {
@@ -73,20 +73,20 @@ export async function readValidatedBodyStrict<T>(
 
   const result = schema.safeParse(body ?? {})
   if (!result.success) {
-    const formattedErrors = result.error.errors.map((err) => ({
-      field: err.path.join('.'),
-      message: err.message
-    }))
-
-    const firstErrorMessage = formattedErrors[0]?.message || 'Neplatná vstupní data'
+    const flattened = result.error.flatten()
+    const fieldErrorsMap = flattened.fieldErrors as Record<string, string[] | undefined>
+    const firstField = Object.keys(fieldErrorsMap)[0]
+    const firstFieldMessage = firstField ? fieldErrorsMap[firstField]?.[0] : undefined
+    const firstErrorMessage =
+      firstFieldMessage ||
+      flattened.formErrors[0] ||
+      'Neplatná vstupní data'
 
     throw createError({
       statusCode: 400,
       statusMessage: 'Bad Request',
       message: firstErrorMessage,
-      data: {
-        errors: formattedErrors
-      }
+      data: flattened
     })
   }
 

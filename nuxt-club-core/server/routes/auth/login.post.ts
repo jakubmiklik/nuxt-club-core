@@ -1,6 +1,5 @@
 import { loginSchema, readValidatedBodyStrict } from '../../utils/validation'
 import { findUserByEmail } from '../../utils/auth'
-import { verifyUserPassword } from '../../utils/password'
 
 export default defineEventHandler(async (event) => {
   // 1. Zvalidujeme vstupní data
@@ -18,8 +17,8 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // 4. Ověříme heslo proti uloženému hashi
-  const isPasswordValid = await verifyUserPassword(user.passwordHash, password)
+  // 4. Ověříme heslo proti uloženému hashi pomocí verifyPassword z nuxt-auth-utils
+  const isPasswordValid = await verifyPassword(user.passwordHash, password)
   if (!isPasswordValid) {
     throw createError({
       statusCode: 401,

@@ -6,18 +6,19 @@
 
 ## 🚀 Hlavní přednosti
 
-- **Nuxt 4 Ready:** Navrženo pro moderní Nuxt 4 adresářovou strukturu (`app/` a `server/`).
+- **Nuxt 4 Ready:** Striktní rozdělení do adresářů `app/` a `server/`.
 - **Duální autentizace:**
-  - Google OAuth 2.0 (one-click přihlášení s profilovým avatarem).
-  - Klasická registrace a přihlášení (e-mail + bezpečné heslo).
+  - Google OAuth 2.0 (one-click přihlášení s profilovým avatarem přes `oauthGoogleEventHandler`).
+  - Klasická registrace a přihlášení (e-mail + heslo s `verifyPassword` a `hashPassword` z `nuxt-auth-utils`).
 - **Bezpečná šifrovaná Session:** Integrováno s `nuxt-auth-utils` (zašifrované HTTP-only cookies, Web Crypto API).
-- **Bezpečné hashování hesel:** Využívá vestavěný kryptografický algoritmus (Scrypt) z `nuxt-auth-utils` – žádné nativní C++ kompilace (bcrypt/node-gyp).
-- **Role-Based Access Control (RBAC):**
-  - Předdefinované role pro sportovní oddíly: `'admin' | 'coach' | 'member' | 'parent'`.
-  - Ochrana na serveru (`requireRole`) i na frontendu (`require-role` middleware).
-- **Zod validace:** Striktní typová validace všech vstupů se srozumitelnými chybovými hláškami v češtině.
-- **Databázová nezávislost (Nitro Hooks Pattern):** Layer není svázán s konkrétní databází ani ORM; hostitelská aplikace jednoduše napojí svou DB (např. **Drizzle ORM**) pomocí přehledných Nitro hooků.
-- **Hotové UI komponenty:** Stylováno moderním Tailwind CSS, přístupné formuláře, loading stavy, přepínání zobrazení hesel.
+- **Hybridní RBAC Model:**
+  - Globální základní role: `BaseRole = 'admin' | 'user'`.
+  - Možnost libovolného rozšíření v aplikaci přes `interface CustomRoles {}` (TypeScript declaration merging).
+  - Výsledná role `AppRole = BaseRole | keyof CustomRoles`.
+  - Automatický superadmin pass: Uživatel s rolí `'admin'` má automatický přístup bez nutnosti uvádět `'admin'` v každém guardu.
+- **Zod validace se striktním výstupem:** `readValidatedBodyStrict` vrací formátované chyby 400 s detaily z `result.error.flatten()`.
+- **Databázová nezávislost (Nitro Hooks Pattern):** Layer neobsahuje pevnou vazbu na DB; hostitelská aplikace napojí svou DB (např. **Drizzle ORM**) pomocí Nitro hooků (`auth:find-user-by-email`, `auth:create-user`, `auth:find-or-create-oauth-user`).
+- **Hotové UI komponenty v Tailwind CSS:** Přístupné formuláře, loading stavy, přepínání hesel, Google button a uživatelské menu.
 
 ---
 
@@ -33,7 +34,7 @@ nuxt-club-core/
 │   │   └── AuthUserMenu.vue        # Uživatelský profil (avatar, badge role, odhlášení)
 │   └── middleware/
 │       ├── auth.ts                 # Klientský guard (přesměrování nepřihlášených na /login)
-│       └── require-role.ts         # Guard kontrolující meta.role v definePageMeta
+│       └── role.ts                 # Guard kontrolující meta.roles v definePageMeta
 ├── server/
 │   ├── routes/
 │   │   └── auth/
@@ -46,7 +47,7 @@ nuxt-club-core/
 │       ├── password.ts             # Wrapper pro hashUserPassword() a verifyUserPassword()
 │       └── validation.ts           # Helpery: readValidatedBodyStrict(), Zod schémata
 ├── types/
-│   └── auth.d.ts                   # Rozšíření '#auth-utils', role a Nitro hooky
+│   └── auth.d.ts                   # Hybridní RBAC typy, rozšíření '#auth-utils' a Nitro hooky
 ├── .env.example
 ├── nuxt.config.ts
 ├── package.json
@@ -67,11 +68,14 @@ export default defineNuxtConfig({
   // Připojení z privátního GitHub repozitáře nebo lokální cesty:
   extends: [
     'github:organisace/nuxt-club-core#main'
-    // nebo pro lokální vývoj monorepa:
+    // nebo pro lokální vývoj:
     // '../packages/nuxt-club-core'
   ]
 })
 ```
+
+> **Poznámka k privátním repozitářům (Giget):**
+> Při stažení přes Giget nastavte environment proměnnou `GIGET_AUTH=<váš_github_token>`.
 
 ### 2. Konfigurace prostředí (`.env`)
 
@@ -92,37 +96,37 @@ NUXT_PUBLIC_AUTH_DEFAULT_REDIRECT=/dashboard
 
 ---
 
+## 🥋 Rozšíření rolí v aplikaci (Hybridní RBAC Model)
+
+Layer definuje základní role `BaseRole = 'admin' | 'user'`. Hostitelská aplikace může přidat vlastní specifické role (např. Trenér, Rodič, Závodník) jednoduše pomocí TypeScript Declaration Merging:
+
+```ts
+// app/types/auth.d.ts v hostitelské aplikaci
+declare module 'nuxt-club-core/types/auth' {
+  interface CustomRoles {
+    coach: true
+    member: true
+    parent: true
+    referee: true
+  }
+}
+```
+
+Následně `AppRole` automaticky obsahuje `'admin' | 'user' | 'coach' | 'member' | 'parent' | 'referee'`.
+
+---
+
 ## 🗄️ Napojení na databázi hostitelské aplikace (Drizzle ORM)
 
 Protože schéma databáze leží v konkrétní aplikaci klubu, komunikace probíhá přes standardizované a typované **Nitro Hooks**.
 
-### Příklad: Schéma v Drizzle (`server/database/schema.ts`)
-
-```ts
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core'
-
-export const users = sqliteTable('users', {
-  id: text('id').primaryKey(),
-  email: text('email').notNull().unique(),
-  name: text('name').notNull(),
-  passwordHash: text('password_hash'),
-  role: text('role', { enum: ['admin', 'coach', 'member', 'parent'] })
-    .default('member')
-    .notNull(),
-  avatar: text('avatar'),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull()
-})
-```
-
 ### Příklad: Registrace Nitro pluginu (`server/plugins/auth-adapter.ts`)
-
-Vytvořte ve své hostitelské aplikaci soubor `server/plugins/auth-adapter.ts`:
 
 ```ts
 import { eq } from 'drizzle-orm'
 import { db } from '../database'
 import { users } from '../database/schema'
-import type { UserRole } from '#auth-utils'
+import type { AppRole } from 'nuxt-club-core/types/auth'
 
 export default defineNitroPlugin((nitroApp) => {
   // 1. Vyhledání uživatele podle e-mailu (pro přihlášení nebo kontrolu duplicity)
@@ -135,7 +139,7 @@ export default defineNitroPlugin((nitroApp) => {
         id: user.id,
         email: user.email,
         name: user.name,
-        role: user.role as UserRole,
+        role: user.role as AppRole,
         passwordHash: user.passwordHash || undefined,
         avatar: user.avatar || undefined
       }
@@ -152,7 +156,7 @@ export default defineNitroPlugin((nitroApp) => {
         email: payload.email.toLowerCase(),
         name: payload.name,
         passwordHash: payload.passwordHash,
-        role: payload.role || 'member',
+        role: payload.role || 'user',
         createdAt: new Date()
       })
       .returning()
@@ -161,7 +165,7 @@ export default defineNitroPlugin((nitroApp) => {
       id: created.id,
       email: created.email,
       name: created.name,
-      role: created.role as UserRole,
+      role: created.role as AppRole,
       avatar: created.avatar || undefined
     }
   })
@@ -181,25 +185,18 @@ export default defineNitroPlugin((nitroApp) => {
           email: payload.email.toLowerCase(),
           name: payload.name,
           avatar: payload.avatar,
-          role: 'member',
+          role: 'user',
           createdAt: new Date()
         })
         .returning()
       user = newUser
-    } else if (payload.avatar && !user.avatar) {
-      // Volitelná aktualizace avataru, pokud v DB chybí
-      await db
-        .update(users)
-        .set({ avatar: payload.avatar })
-        .where(eq(users.id, user.id))
-      user.avatar = payload.avatar
     }
 
     result.user = {
       id: user.id,
       email: user.email,
       name: user.name,
-      role: user.role as UserRole,
+      role: user.role as AppRole,
       avatar: user.avatar || undefined
     }
   })
@@ -210,48 +207,35 @@ export default defineNitroPlugin((nitroApp) => {
 
 ## 🛡️ Ochrana stránek a Role-Based Access Control (RBAC)
 
-### 1. Klientská ochrana stránek (Nuxt Middleware)
+### 1. Klientská ochrana stránek (`app/middleware/`)
 
-Layer poskytuje dva připravené klientské guards:
+Layer poskytuje dva klientské middleware:
 
-- `auth`: Pouze pro přihlášené uživatele (nepřihlášené přesměruje na `/login`).
-- `require-role`: Zkontroluje, zda má přihlášený uživatel roli definovanou v `meta.role` nebo `meta.roles`.
-
-#### Příklad: Sekce pouze pro trenéry a správce (`app/pages/trainings/manage.vue`):
+- `auth`: Pouze pro přihlášené uživatele (nepřihlášené přesměruje na `/login` s parametrem `?redirect=...`).
+- `role`: Zkontroluje, zda má přihlášený uživatel roli definovanou v `roles: [...]`. **Uživatel s rolí `'admin'` má přístup povolen vždy automaticky.**
 
 ```vue
+<!-- app/pages/admin/dashboard.vue -->
 <script setup lang="ts">
 definePageMeta({
-  middleware: ['auth', 'require-role'],
+  middleware: ['auth', 'role'],
   roles: ['admin', 'coach'],
-  // Volitelné přesměrování při nedostatečném oprávnění:
   unauthorizedRedirect: '/dashboard'
 })
 </script>
-
-<template>
-  <div>
-    <h1>Správa tréninků a docházky (Pouze Trenér a Admin)</h1>
-  </div>
-</template>
 ```
-
----
 
 ### 2. Ochrana serverových Nitro endpointů (`server/routes/...`)
 
-Pro zabezpečení vlastních API tras v hostitelské aplikaci použijte serverové utility layeru:
-
 ```ts
-// server/api/club/trainings.post.ts
+// server/api/club/members.get.ts
 export default defineEventHandler(async (event) => {
-  // Ověří, že uživatel je přihlášen a má roli 'admin' nebo 'coach'
-  const user = await requireRole(event, ['admin', 'coach'])
+  // Ověří, že uživatel je přihlášen a má roli 'coach' (nebo 'admin', který projde automaticky)
+  const user = await requireRole(event, ['coach'])
 
-  // Zde pokračuje bezpečná byznys logika
   return {
     success: true,
-    createdBy: user.name
+    data: []
   }
 })
 ```
@@ -260,58 +244,12 @@ export default defineEventHandler(async (event) => {
 
 ## 🎨 Frontendové komponenty
 
-Všechny komponenty jsou automaticky importovány do vaší aplikace bez nutnosti explicitního importu:
+Všechny komponenty jsou automaticky importovány do vaší aplikace:
 
-### 1. Přihlašovací stránka (`app/pages/login.vue`)
-
-```vue
-<template>
-  <div class="min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-950">
-    <AuthLoginForm redirect-to="/dashboard" />
-  </div>
-</template>
-```
-
-### 2. Registrační stránka (`app/pages/register.vue`)
-
-```vue
-<template>
-  <div class="min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-950">
-    <AuthRegisterForm redirect-to="/dashboard" />
-  </div>
-</template>
-```
-
-### 3. Uživatelské menu v hlavičce (`app/components/AppHeader.vue`)
-
-```vue
-<template>
-  <header class="flex items-center justify-between px-6 py-4 border-b">
-    <div class="font-bold text-xl">Judo Club Praha</div>
-
-    <!-- Uživatelský profilový panel se slotem na vlastní odkazy -->
-    <AuthUserMenu redirect-after-logout="/login">
-      <template #default="{ user, close }">
-        <NuxtLink
-          to="/profile"
-          class="block px-3 py-2 text-sm rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
-          @click="close"
-        >
-          Můj profil
-        </NuxtLink>
-        <NuxtLink
-          v-if="user.role === 'admin' || user.role === 'coach'"
-          to="/admin/members"
-          class="block px-3 py-2 text-sm rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
-          @click="close"
-        >
-          Správa členů
-        </NuxtLink>
-      </template>
-    </AuthUserMenu>
-  </header>
-</template>
-```
+- `<AuthLoginForm />`: Formulář e-mail + heslo s přepínáním viditelnosti, chybovými stavy a tlačítkem Google.
+- `<AuthRegisterForm />`: Registrační formulář se jménem, e-mailem a potvrzením shody hesel.
+- `<AuthLoginButton />`: Samostatné tlačítko „Přihlásit přes Google“ s SVG logem.
+- `<AuthUserMenu />`: Dropdown lišta pro hlavičku s avatarem (či iniciálami), jménem, odznakem role a tlačítkem odhlášení.
 
 ---
 
