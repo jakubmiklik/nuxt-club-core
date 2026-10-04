@@ -29,7 +29,7 @@ function handleSeznamLogin() {
   }
 
   // Přesměrování na serverový Seznam OAuth route
-  window.location.href = '/auth/seznam'
+  window.location.href = '/api/auth/seznam'
 }
 </script>
 

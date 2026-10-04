@@ -66,7 +66,7 @@ async function fetchUsers(): Promise<void> {
       total: number
       page: number
       limit: number
-    }>('/admin/users', {
+    }>('/api/admin/users', {
       params
     })
 
@@ -111,7 +111,7 @@ async function handleRoleChange(user: ClubUser, newRole: AppRole): Promise<void>
   statusMessage.value = null
 
   try {
-    await $fetch(`/admin/users/${user.id}/role`, {
+    await $fetch(`/api/admin/users/${user.id}/role`, {
       method: 'PUT',
       body: { role: newRole }
     })
@@ -143,7 +143,7 @@ async function handleToggleStatus(user: ClubUser): Promise<void> {
   statusMessage.value = null
 
   try {
-    await $fetch(`/admin/users/${user.id}/status`, {
+    await $fetch(`/api/admin/users/${user.id}/status`, {
       method: 'PUT',
       body: { status: newStatus }
     })

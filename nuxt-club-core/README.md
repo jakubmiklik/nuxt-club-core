@@ -240,7 +240,7 @@ definePageMeta({
 </script>
 ```
 
-### 2. Ochrana serverových Nitro endpointů (`server/routes/...`)
+### 2. Ochrana serverových Nitro endpointů (`server/api/...`)
 
 ```ts
 // server/api/club/members.get.ts

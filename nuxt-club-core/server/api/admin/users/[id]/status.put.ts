@@ -1,7 +1,7 @@
-import { requireRole, updateAdminUserStatus } from '../../../utils/auth'
-import { readValidatedBodyStrict, adminUpdateStatusSchema } from '../../../utils/validation'
-import { createClubError } from '../../../utils/errors'
-import { recordAuditLog } from '../../../utils/audit'
+import { requireRole, updateAdminUserStatus } from '../../../../utils/auth'
+import { readValidatedBodyStrict, adminUpdateStatusSchema } from '../../../../utils/validation'
+import { createClubError } from '../../../../utils/errors'
+import { recordAuditLog } from '../../../../utils/audit'
 
 export interface AdminUpdateStatusResponse {
   success: boolean

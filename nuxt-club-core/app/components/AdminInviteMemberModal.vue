@@ -63,7 +63,7 @@ async function handleSendInvitation() {
       invitation: ClubInvitation
       inviteUrl: string
       emailSent: boolean
-    }>('/admin/invitations', {
+    }>('/api/admin/invitations', {
       method: 'POST',
       body: {
         email: form.email,

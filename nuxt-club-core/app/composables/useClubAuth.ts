@@ -51,11 +51,11 @@ export interface UseClubAuthReturn {
    */
   hasRole: (roles: AppRole | AppRole[]) => boolean
   /**
-   * Přihlášení uživatele e-mailem a heslem přes /auth/login
+   * Přihlášení uživatele e-mailem a heslem přes /api/auth/login
    */
   login: (credentials: LoginInput) => Promise<LoginResponse>
   /**
-   * Odhlášení uživatele přes /auth/logout a pročištění session
+   * Odhlášení uživatele přes /api/auth/logout a pročištění session
    */
   logout: () => Promise<void>
   /**
@@ -152,7 +152,7 @@ export function useClubAuth(): UseClubAuthReturn {
   }
 
   async function login(credentials: LoginInput): Promise<LoginResponse> {
-    const response = await $fetch<LoginResponse>('/auth/login', {
+    const response = await $fetch<LoginResponse>('/api/auth/login', {
       method: 'POST',
       body: credentials
     })
@@ -165,7 +165,7 @@ export function useClubAuth(): UseClubAuthReturn {
 
   async function logout(): Promise<void> {
     try {
-      await $fetch('/auth/logout', {
+      await $fetch('/api/auth/logout', {
         method: 'POST'
       })
     } finally {
@@ -186,7 +186,7 @@ export function useClubAuth(): UseClubAuthReturn {
     }
 
     try {
-      const data = await $fetch<ClubMemberProfile[] | { members: ClubMemberProfile[] }>('/auth/members')
+      const data = await $fetch<ClubMemberProfile[] | { members: ClubMemberProfile[] }>('/api/auth/members')
       const result = Array.isArray(data) ? data : (data?.members || [])
       fetchedMembers.value = result
       return result
@@ -196,7 +196,7 @@ export function useClubAuth(): UseClubAuthReturn {
   }
 
   async function switchMember(memberId: string | number): Promise<void> {
-    await $fetch('/auth/switch-member', {
+    await $fetch('/api/auth/switch-member', {
       method: 'POST',
       body: { memberId }
     })
@@ -206,7 +206,7 @@ export function useClubAuth(): UseClubAuthReturn {
   }
 
   async function switchSeason(seasonId: string | number): Promise<void> {
-    await $fetch('/auth/context', {
+    await $fetch('/api/auth/context', {
       method: 'POST',
       body: { seasonId }
     })
@@ -216,7 +216,7 @@ export function useClubAuth(): UseClubAuthReturn {
   }
 
   async function switchBranch(branchId: string | number): Promise<void> {
-    await $fetch('/auth/context', {
+    await $fetch('/api/auth/context', {
       method: 'POST',
       body: { branchId }
     })

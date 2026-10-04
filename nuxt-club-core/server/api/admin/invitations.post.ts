@@ -6,7 +6,7 @@ import type { AppRole } from '../../../types/auth'
 
 export default defineEventHandler(async (event) => {
   // 1. Chráněno: přístup mají pouze role admin a coach
-  const currentUser = await requireRole(event, ['admin', 'coach'])
+  const currentUser = await requireRole(event, ['admin', 'coach' as AppRole])
 
   // 2. Validace vstupních parametrů
   const input = await readValidatedBodyStrict(event, createInvitationSchema)

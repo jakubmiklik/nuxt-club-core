@@ -46,7 +46,7 @@ async function handleLogin() {
   errorMessage.value = null
 
   try {
-    const response = await $fetch<{ success: boolean; user: ClubUser }>('/auth/login', {
+    const response = await $fetch<{ success: boolean; user: ClubUser }>('/api/auth/login', {
       method: 'POST',
       body: {
         email: form.email,

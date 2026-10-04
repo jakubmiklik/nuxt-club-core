@@ -99,7 +99,7 @@ async function handleChangePassword() {
   isLoading.value = true
 
   try {
-    const response = await $fetch<{ success: boolean; message?: string }>('/auth/change-password', {
+    const response = await $fetch<{ success: boolean; message?: string }>('/api/auth/change-password', {
       method: 'POST',
       body: {
         currentPassword: form.currentPassword,

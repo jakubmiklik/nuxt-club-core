@@ -1,8 +1,8 @@
-import { requireRole, updateAdminUserRole } from '../../../utils/auth'
-import { readValidatedBodyStrict, adminUpdateRoleSchema } from '../../../utils/validation'
-import { createClubError } from '../../../utils/errors'
-import { recordAuditLog } from '../../../utils/audit'
-import type { AppRole } from '../../../../types/auth'
+import { requireRole, updateAdminUserRole } from '../../../../utils/auth'
+import { readValidatedBodyStrict, adminUpdateRoleSchema } from '../../../../utils/validation'
+import { createClubError } from '../../../../utils/errors'
+import { recordAuditLog } from '../../../../utils/audit'
+import type { AppRole } from '../../../../../types/auth'
 
 export interface AdminUpdateRoleResponse {
   success: boolean

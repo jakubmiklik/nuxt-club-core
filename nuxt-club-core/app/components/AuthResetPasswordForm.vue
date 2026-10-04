@@ -111,7 +111,7 @@ async function handleResetPassword() {
   isLoading.value = true
 
   try {
-    await $fetch('/auth/reset-password', {
+    await $fetch('/api/auth/reset-password', {
       method: 'POST',
       body: {
         token: resolvedToken.value,

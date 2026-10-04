@@ -13,11 +13,11 @@ const props = withDefaults(
      */
     compact?: boolean
     /**
-     * Předvyplněný seznam sezón (pokud nechceme načítat z endpointu /auth/seasons)
+     * Předvyplněný seznam sezón (pokud nechceme načítat z endpointu /api/auth/seasons)
      */
     seasons?: ClubSeason[]
     /**
-     * Předvyplněný seznam poboček (pokud nechceme načítat z endpointu /auth/branches)
+     * Předvyplněný seznam poboček (pokud nechceme načítat z endpointu /api/auth/branches)
      */
     branches?: ClubBranch[]
   }>(),
@@ -61,7 +61,7 @@ async function fetchSeasons(): Promise<void> {
   }
   isLoadingSeasons.value = true
   try {
-    const data = await $fetch<{ seasons: ClubSeason[] } | ClubSeason[]>('/auth/seasons')
+    const data = await $fetch<{ seasons: ClubSeason[] } | ClubSeason[]>('/api/auth/seasons')
     seasonList.value = Array.isArray(data) ? data : (data?.seasons || [])
   } catch (err) {
     console.error('[AuthSeasonSwitcher] Nepodařilo se načíst sezóny:', err)
@@ -78,7 +78,7 @@ async function fetchBranches(): Promise<void> {
   }
   isLoadingBranches.value = true
   try {
-    const data = await $fetch<{ branches: ClubBranch[] } | ClubBranch[]>('/auth/branches')
+    const data = await $fetch<{ branches: ClubBranch[] } | ClubBranch[]>('/api/auth/branches')
     branchList.value = Array.isArray(data) ? data : (data?.branches || [])
   } catch (err) {
     console.error('[AuthSeasonSwitcher] Nepodařilo se načíst pobočky:', err)

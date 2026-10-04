@@ -79,7 +79,7 @@ async function handleRegister() {
   fieldErrors.value = {}
 
   try {
-    const response = await $fetch<{ success: boolean; user: ClubUser }>('/auth/register', {
+    const response = await $fetch<{ success: boolean; user: ClubUser }>('/api/auth/register', {
       method: 'POST',
       body: {
         name: form.name,

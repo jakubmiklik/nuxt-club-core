@@ -86,7 +86,7 @@ async function verifyToken() {
       role: AppRole
       category?: string
       expiresAt: string | Date
-    }>('/auth/invite', {
+    }>('/api/auth/invite', {
       params: { token: invitationToken.value }
     })
 
@@ -123,7 +123,7 @@ async function handleAcceptInvite() {
   fieldErrors.value = {}
 
   try {
-    const response = await $fetch<{ success: boolean; user: ClubUser }>('/auth/accept-invite', {
+    const response = await $fetch<{ success: boolean; user: ClubUser }>('/api/auth/accept-invite', {
       method: 'POST',
       body: {
         token: invitationToken.value,

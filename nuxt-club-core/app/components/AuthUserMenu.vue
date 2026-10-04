@@ -115,7 +115,7 @@ async function handleLogout() {
 
   isLoggingOut.value = true
   try {
-    await $fetch('/auth/logout', { method: 'POST' })
+    await $fetch('/api/auth/logout', { method: 'POST' })
     await clear()
     closeMenu()
     await navigateTo(props.redirectAfterLogout)

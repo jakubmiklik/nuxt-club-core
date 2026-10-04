@@ -128,7 +128,7 @@ async function handleUpdateProfile() {
   isLoading.value = true
 
   try {
-    const response = await $fetch<{ success: boolean; user: ClubUser }>('/auth/profile', {
+    const response = await $fetch<{ success: boolean; user: ClubUser }>('/api/auth/profile', {
       method: 'PUT',
       body: {
         name: form.name.trim(),

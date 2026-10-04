@@ -62,7 +62,7 @@ async function handleForgotPassword() {
   isLoading.value = true
 
   try {
-    await $fetch('/auth/forgot-password', {
+    await $fetch('/api/auth/forgot-password', {
       method: 'POST',
       body: {
         email: cleanEmail

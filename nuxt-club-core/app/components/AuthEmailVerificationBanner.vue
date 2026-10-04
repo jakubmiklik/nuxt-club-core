@@ -38,7 +38,7 @@ async function handleResend() {
   feedbackMessage.value = null
 
   try {
-    const res = await $fetch<{ success: boolean; message: string }>('/auth/resend-verification', {
+    const res = await $fetch<{ success: boolean; message: string }>('/api/auth/resend-verification', {
       method: 'POST'
     })
 
