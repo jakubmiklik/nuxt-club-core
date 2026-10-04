@@ -28,26 +28,41 @@
 nuxt-club-core/
 ├── app/
 │   ├── components/
-│   │   ├── AuthLoginForm.vue       # Formulář e-mail + heslo s Google OAuth tlačítkem
-│   │   ├── AuthRegisterForm.vue    # Registrace (jméno, e-mail, heslo, heslo znovu)
-│   │   ├── AuthLoginButton.vue     # Samostatné Google OAuth tlačítko
-│   │   └── AuthUserMenu.vue        # Uživatelský profil (avatar, badge role, odhlášení)
+│   │   ├── AuthLoginForm.vue          # Formulář e-mail + heslo s Google OAuth tlačítkem
+│   │   ├── AuthRegisterForm.vue       # Registrace (jméno, e-mail, heslo, GDPR souhlas)
+│   │   ├── AuthProfileForm.vue        # Editace profilu (jméno, avatar) s živým náhledem
+│   │   ├── AuthChangePasswordForm.vue # Změna hesla s indikátorem síly hesla
+│   │   ├── AuthForgotPasswordForm.vue # Žádost o obnovu hesla (e-mail + nápověda ke schránce)
+│   │   ├── AuthResetPasswordForm.vue  # Formulář pro nastavení nového hesla s validací tokenu
+│   │   ├── AuthLoginButton.vue        # Samostatné Google OAuth tlačítko
+│   │   ├── AuthUserMenu.vue           # Uživatelský profil (avatar, badge role, odhlášení)
+│   │   ├── AuthMemberSwitcher.vue     # Přepínač aktivního členského/sportovního profilu v session
+│   │   └── CanRole.vue                # Deklarativní RBAC komponenta pro zobrazení obsahu dle rolí
+│   ├── composables/
+│   │   └── useClubAuth.ts             # Klíčová composable pro auth, RBAC a správu profilů
 │   └── middleware/
-│       ├── auth.ts                 # Klientský guard (přesměrování nepřihlášených na /login)
-│       └── role.ts                 # Guard kontrolující meta.roles v definePageMeta
+│       ├── auth.ts                    # Klientský guard (přesměrování nepřihlášených na /login)
+│       └── role.ts                    # Guard kontrolující meta.roles v definePageMeta
 ├── server/
 │   ├── routes/
 │   │   └── auth/
-│   │       ├── google.get.ts       # Google OAuth callback handler
-│   │       ├── login.post.ts       # API: Přihlášení přes e-mail a heslo
-│   │       ├── register.post.ts    # API: Registrace uživatele
-│   │       └── logout.post.ts      # API: Vymazání session (clearUserSession)
+│   │       ├── google.get.ts          # Google OAuth callback handler
+│   │       ├── login.post.ts          # API: Přihlášení přes e-mail a heslo
+│   │       ├── register.post.ts       # API: Registrace uživatele
+│   │       ├── profile.put.ts         # API: Aktualizace profilu uživatele (jméno, avatar)
+│   │       ├── change-password.post.ts# API: Změna hesla přihlášeného uživatele
+│   │       ├── logout.post.ts         # API: Vymazání session (clearUserSession)
+│   │       ├── members.get.ts         # API: Získání členských profilů přihlášeného uživatele
+│   │       ├── switch-member.post.ts  # API: Přepnutí aktivního člena v relaci
+│   │       ├── forgot-password.post.ts# API: Žádost o reset hesla (rate limit + token)
+│   │       └── reset-password.post.ts # API: Dokončení resetu hesla
 │   └── utils/
-│       ├── auth.ts                 # Helpery: requireUser(), requireRole(), DB dispatchery
-│       ├── password.ts             # Wrapper pro hashUserPassword() a verifyUserPassword()
-│       └── validation.ts           # Helpery: readValidatedBodyStrict(), Zod schémata
+│       ├── auth.ts                    # Helpery: requireUser(), requireRole(), DB dispatchery
+│       ├── password.ts                # Wrapper pro hashUserPassword() a verifyUserPassword()
+│       ├── rateLimit.ts               # Bezpečnostní rate limiting pro citlivé endpointy
+│       └── validation.ts              # Helpery: readValidatedBodyStrict(), Zod schémata
 ├── types/
-│   └── auth.d.ts                   # Hybridní RBAC typy, rozšíření '#auth-utils' a Nitro hooky
+│   └── auth.d.ts                      # Hybridní RBAC typy, ClubMemberProfile, session a Nitro hooky
 ├── .env.example
 ├── nuxt.config.ts
 ├── package.json
@@ -246,10 +261,49 @@ export default defineEventHandler(async (event) => {
 
 Všechny komponenty jsou automaticky importovány do vaší aplikace:
 
-- `<AuthLoginForm />`: Formulář e-mail + heslo s přepínáním viditelnosti, chybovými stavy a tlačítkem Google.
-- `<AuthRegisterForm />`: Registrační formulář se jménem, e-mailem a potvrzením shody hesel.
+- `<AuthLoginForm />`: Formulář e-mail + heslo s přepínáním viditelnosti, chybovými stavy, odkazem na zapomenuté heslo a tlačítky Google a Seznam.cz.
+- `<AuthRegisterForm />`: Registrační formulář se jménem, e-mailem, heslem a souhlasem se zpracováním osobních údajů (GDPR).
+- `<AuthProfileForm />`: Formulář pro editaci uživatelského profilu (jméno, URL avatara) s živým náhledem fotografie nebo iniciál.
+- `<AuthChangePasswordForm />`: Formulář pro změnu hesla přihlášeného uživatele se starým heslem, novým heslem, potvrzením a indikátorem bezpečnosti.
+- `<AuthForgotPasswordForm />`: Formulář pro vyžádání odkazu pro obnovu zapomenutého hesla s e-mailovou validací a stavem úspěchu.
+- `<AuthResetPasswordForm />`: Formulář pro nastavení nového hesla s validací tokenu a indikátorem síly a shody hesel.
 - `<AuthLoginButton />`: Samostatné tlačítko „Přihlásit přes Google“ s SVG logem.
+- `<AuthSeznamLoginButton />`: Samostatné tlačítko „Přihlásit přes Seznam.cz“ se signifikantním logem.
 - `<AuthUserMenu />`: Dropdown lišta pro hlavičku s avatarem (či iniciálami), jménem, odznakem role a tlačítkem odhlášení.
+- `<AuthMemberSwitcher />`: Přepínač aktivního člena / sportovce v hlavičce (ideální např. pro rodiče se dvěma dětmi v klubu). Zobrazuje aktuální profil, odznaky kategorií, evid. čísla, plynulé přepínání relace a indikátor probíhajícího přepnutí.
+- `<AuthSeasonSwitcher />`: Přepínač aktivní sezóny a pobočky klubu s přímým propisováním do šifrované relace.
+- `<AuthEmailVerificationBanner />`: Upozorňující banner s tlačítkem na opětovné odeslání ověřovacího e-mailu pro neověřené uživatele.
+- `<AdminUserManagementTable />`: Kompletní administrační tabulka se stránkováním, full-text hledáním, filtry, změnou rolí a blokováním/odblokováním účtů.
+- `<AdminInviteMemberModal />`: Modální okno pro trenéry a administrátory k odeslání pozvánky novému členovi s předvolenou rolí a kategorií.
+- `<AuthAcceptInviteForm />`: Formulář pro registraci pozvaného člena přes bezpečný token.
+- `<CanRole :roles="['coach', 'admin']" />`: Deklarativní RBAC komponenta pro zobrazení obsahu na základě rolí s podporou slotů `#default` a `#unauthorized`.
+
+---
+
+## 🛠️ Composable `useClubAuth()`
+
+Composable pro snadnou a typově bezpečnou práci s uživatelskou relací, oprávněními a profily členů:
+
+```vue
+<script setup lang="ts">
+const {
+  user,
+  loggedIn,
+  isAdmin,
+  hasRole,
+  members,
+  activeMember,
+  switchMember,
+  logout
+} = useClubAuth()
+
+const canEditTraining = computed(() => hasRole(['coach', 'admin']))
+
+async function handleSwitch(memberId: string | number) {
+  await switchMember(memberId)
+}
+</script>
+```
 
 ---
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ClubUser, AppRole } from '../../types/auth'
+import { parseClubError } from '../composables/useClubError'
 
 const props = withDefaults(
   defineProps<{
@@ -9,6 +10,8 @@ const props = withDefaults(
     loginUrl?: string
     allowRoleSelection?: boolean
     defaultRole?: AppRole
+    termsUrl?: string
+    privacyUrl?: string
   }>(),
   {
     redirectTo: '/',
@@ -16,7 +19,9 @@ const props = withDefaults(
     subtitle: 'Vytvořte si účet v klubovém systému',
     loginUrl: '/login',
     allowRoleSelection: false,
-    defaultRole: 'user'
+    defaultRole: 'user',
+    termsUrl: '/terms',
+    privacyUrl: '/privacy'
   }
 )
 
@@ -32,7 +37,8 @@ const form = reactive({
   email: '',
   password: '',
   passwordConfirm: '',
-  role: props.defaultRole
+  role: props.defaultRole,
+  gdprConsent: false
 })
 
 const showPassword = ref(false)
@@ -61,6 +67,13 @@ async function handleRegister() {
     return
   }
 
+  // Kontrola souhlasu s GDPR
+  if (!form.gdprConsent) {
+    errorMessage.value = 'Musíte souhlasit se zpracováním osobních údajů.'
+    fieldErrors.value = { gdprConsent: 'Musíte souhlasit se zpracováním osobních údajů' }
+    return
+  }
+
   isLoading.value = true
   errorMessage.value = null
   fieldErrors.value = {}
@@ -73,7 +86,8 @@ async function handleRegister() {
         email: form.email,
         password: form.password,
         passwordConfirm: form.passwordConfirm,
-        role: form.role
+        role: form.role,
+        gdprConsent: form.gdprConsent
       }
     })
 
@@ -85,30 +99,9 @@ async function handleRegister() {
     // Přesměrujeme uživatele
     await navigateTo(props.redirectTo)
   } catch (err: any) {
-    const errData = err?.data
-    const flattenedData = errData?.data || errData
-
-    // Mapování chyb z result.error.flatten()
-    if (flattenedData?.fieldErrors) {
-      const map: Record<string, string> = {}
-      for (const [field, messages] of Object.entries(flattenedData.fieldErrors)) {
-        if (Array.isArray(messages) && messages.length > 0) {
-          map[field] = messages[0] as string
-        }
-      }
-      fieldErrors.value = map
-    } else if (Array.isArray(flattenedData?.errors)) {
-      const map: Record<string, string> = {}
-      for (const item of flattenedData.errors) {
-        map[item.field] = item.message
-      }
-      fieldErrors.value = map
-    }
-
-    errorMessage.value =
-      errData?.message ||
-      err?.message ||
-      'Registrace se nezdařila. Zkontrolujte prosím zadané údaje.'
+    const parsed = parseClubError(err)
+    fieldErrors.value = parsed.fieldErrors
+    errorMessage.value = parsed.message
 
     emit('error', err)
   } finally {
@@ -242,7 +235,6 @@ async function handleRegister() {
             <option value="member">Člen oddílu (sportovec)</option>
             <option value="parent">Rodič sportovce</option>
             <option value="coach">Trenér</option>
-            <option value="admin">Správce oddílu</option>
           </select>
         </div>
 
@@ -382,6 +374,50 @@ async function handleRegister() {
               <span>{{ req.label }}</span>
             </li>
           </ul>
+        </div>
+
+        <!-- Souhlas se zpracováním osobních údajů (GDPR) -->
+        <div>
+          <div class="flex items-start gap-3 pt-1">
+            <div class="flex h-5 items-center">
+              <input
+                id="reg-gdpr"
+                v-model="form.gdprConsent"
+                type="checkbox"
+                required
+                class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-600 focus:ring-offset-0 dark:border-slate-700 dark:bg-slate-800 dark:checked:bg-blue-600"
+                :class="{ 'border-red-500': fieldErrors.gdprConsent }"
+              />
+            </div>
+            <label
+              for="reg-gdpr"
+              class="text-xs leading-5 text-slate-600 dark:text-slate-300 select-none cursor-pointer"
+            >
+              Souhlasím se
+              <NuxtLink
+                v-if="privacyUrl"
+                :to="privacyUrl"
+                target="_blank"
+                class="font-medium text-blue-600 hover:underline dark:text-blue-400"
+              >
+                zpracováním osobních údajů (GDPR)
+              </NuxtLink>
+              <span v-else class="font-medium">zpracováním osobních údajů (GDPR)</span>
+              a
+              <NuxtLink
+                v-if="termsUrl"
+                :to="termsUrl"
+                target="_blank"
+                class="font-medium text-blue-600 hover:underline dark:text-blue-400"
+              >
+                podmínkami klubu
+              </NuxtLink>
+              <span v-else class="font-medium">podmínkami klubu</span>.
+            </label>
+          </div>
+          <p v-if="fieldErrors.gdprConsent" class="mt-1 text-xs text-red-600 dark:text-red-400">
+            {{ fieldErrors.gdprConsent }}
+          </p>
         </div>
 
         <!-- Submit Tlačítko -->

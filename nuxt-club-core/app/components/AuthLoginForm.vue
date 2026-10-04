@@ -1,20 +1,25 @@
 <script setup lang="ts">
 import type { ClubUser } from '../../types/auth'
+import { parseClubError } from '../composables/useClubError'
 
 const props = withDefaults(
   defineProps<{
     redirectTo?: string
     showGoogleLogin?: boolean
+    showSeznam?: boolean
     title?: string
     subtitle?: string
     registerUrl?: string
+    forgotPasswordUrl?: string
   }>(),
   {
     redirectTo: '/',
     showGoogleLogin: true,
+    showSeznam: true,
     title: 'Vítejte zpět',
     subtitle: 'Přihlaste se do klubového informačního systému',
-    registerUrl: '/register'
+    registerUrl: '/register',
+    forgotPasswordUrl: '/forgot-password'
   }
 )
 
@@ -57,11 +62,8 @@ async function handleLogin() {
     // Přesměrujeme uživatele na požadovanou stránku
     await navigateTo(props.redirectTo)
   } catch (err: any) {
-    const message =
-      err?.data?.message ||
-      err?.message ||
-      'Přihlášení se nezdařilo. Zkontrolujte prosím své údaje.'
-    errorMessage.value = message
+    const parsed = parseClubError(err)
+    errorMessage.value = parsed.message || 'Přihlášení se nezdařilo. Zkontrolujte prosím své údaje.'
     emit('error', err)
   } finally {
     isLoading.value = false
@@ -153,7 +155,15 @@ async function handleLogin() {
             >
               Heslo
             </label>
-            <slot name="forgot-password" />
+            <slot name="forgot-password">
+              <NuxtLink
+                v-if="forgotPasswordUrl"
+                :to="forgotPasswordUrl"
+                class="text-xs font-semibold text-blue-600 hover:text-blue-500 dark:text-blue-400"
+              >
+                Zapomněli jste heslo?
+              </NuxtLink>
+            </slot>
           </div>
           <div class="relative mt-1.5">
             <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
@@ -221,8 +231,8 @@ async function handleLogin() {
         </button>
       </form>
 
-      <!-- Oddělovač "Nebo" a Google OAuth -->
-      <template v-if="showGoogleLogin">
+      <!-- Oddělovač "Nebo" a Sociální OAuth přihlášení -->
+      <template v-if="showGoogleLogin || showSeznam">
         <div class="relative my-6">
           <div class="absolute inset-0 flex items-center">
             <div class="w-full border-t border-slate-200 dark:border-slate-800" />
@@ -234,7 +244,10 @@ async function handleLogin() {
           </div>
         </div>
 
-        <AuthLoginButton :redirect-to="redirectTo" />
+        <div class="space-y-3">
+          <AuthLoginButton v-if="showGoogleLogin" :redirect-to="redirectTo" />
+          <AuthSeznamLoginButton v-if="showSeznam" :redirect-to="redirectTo" />
+        </div>
       </template>
 
       <!-- Odkaz na registraci -->

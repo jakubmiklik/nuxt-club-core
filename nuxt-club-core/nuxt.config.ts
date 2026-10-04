@@ -34,6 +34,10 @@ export default defineNuxtConfig({
       google: {
         clientId: process.env.NUXT_OAUTH_GOOGLE_CLIENT_ID || '',
         clientSecret: process.env.NUXT_OAUTH_GOOGLE_CLIENT_SECRET || ''
+      },
+      seznam: {
+        clientId: process.env.NUXT_OAUTH_SEZNAM_CLIENT_ID || '',
+        clientSecret: process.env.NUXT_OAUTH_SEZNAM_CLIENT_SECRET || ''
       }
     },
     public: {

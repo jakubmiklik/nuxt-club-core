@@ -1,4 +1,4 @@
-import { findOrCreateOAuthUser } from '../../utils/auth'
+import { findOrCreateOAuthUser, getUserMembers } from '../../utils/auth'
 
 export default defineOAuthGoogleEventHandler({
   async onSuccess(event, { user: googleUser, tokens: _tokens }) {
@@ -20,15 +20,24 @@ export default defineOAuthGoogleEventHandler({
       providerId: googleUser.sub
     })
 
-    // 2. Nastavíme šifrovanou uživatelskou session
+    // 2. Načteme profily členů a určíme výchozí aktivní profil
+    const members = await getUserMembers(user.id)
+    const primaryMember = members.find((m) => m.isPrimary) || members[0]
+
+    // 3. Nastavíme šifrovanou uživatelskou session
     await setUserSession(event, {
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
         role: user.role || 'user',
-        avatar: user.avatar || googleUser.picture
+        avatar: user.avatar || googleUser.picture,
+        emailVerified: user.emailVerified ?? true,
+        activeMemberId: primaryMember?.id,
+        members
       },
+      activeMemberId: primaryMember?.id,
+      members,
       loggedInAt: Date.now()
     })
 
