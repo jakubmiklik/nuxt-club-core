@@ -210,7 +210,7 @@ async function handleLogout() {
 
         <!-- Vlastní slot pro navigaci hostitelské aplikace (např. Profil, Tréninky, Administrace) -->
         <div v-if="$slots.default" class="py-1 border-b border-slate-100 dark:border-slate-800">
-          <slot :user="user" :close="closeMenu" />
+          <slot :user="user || {}" :close="closeMenu" />
         </div>
 
         <!-- Tlačítko Odhlásit se -->
