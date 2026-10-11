@@ -40,8 +40,15 @@ export default defineNuxtConfig({
         clientSecret: process.env.NUXT_OAUTH_SEZNAM_CLIENT_SECRET || ''
       }
     },
+    clubAuth: {
+      allowRegistration: process.env.NUXT_CLUB_AUTH_ALLOW_REGISTRATION === 'true' || false,
+      allowedEmails: (process.env.NUXT_CLUB_AUTH_ALLOWED_EMAILS || '').split(',').map((e: string) => e.trim().toLowerCase()).filter(Boolean),
+      defaultRole: 'user',
+      adminRoles: ['admin', 'editor']
+    },
     public: {
       clubAuth: {
+        allowRegistration: process.env.NUXT_CLUB_AUTH_ALLOW_REGISTRATION === 'true' || false,
         loginPath: '/login',
         registerPath: '/register',
         defaultRedirect: '/',

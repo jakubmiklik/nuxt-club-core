@@ -1,11 +1,22 @@
 import { describe, it, expect, vi } from 'vitest'
-import { requireRole, requireUser } from '../server/utils/auth'
+import { requireRole, requireUser, requireAdminAuth } from '../server/utils/auth'
 import type { AppRole, ClubUser } from '../types/auth'
 import type { H3Event } from 'h3'
 
 // Mock global getUserSession from nuxt-auth-utils
 const mockGetUserSession = vi.fn()
 vi.stubGlobal('getUserSession', mockGetUserSession)
+
+// Mock global useRuntimeConfig
+const mockUseRuntimeConfig = vi.fn(() => ({
+  clubAuth: {
+    allowRegistration: false,
+    allowedEmails: ['special@club.cz'],
+    defaultRole: 'user',
+    adminRoles: ['admin', 'editor']
+  }
+}))
+vi.stubGlobal('useRuntimeConfig', mockUseRuntimeConfig)
 
 // Helper to test client-side hasRole logic (as in useClubAuth)
 function checkHasRole(
@@ -127,6 +138,69 @@ describe('RBAC Logic & Superadmin Pass', () => {
         data: {
           code: 'FORBIDDEN'
         }
+      })
+    })
+  })
+
+  describe('Server-side requireAdminAuth', () => {
+    it('throws 403 Forbidden when session has no user', async () => {
+      mockGetUserSession.mockResolvedValueOnce(null)
+
+      await expect(requireAdminAuth(dummyEvent)).rejects.toMatchObject({
+        statusCode: 403
+      })
+    })
+
+    it('allows access for admin role', async () => {
+      const adminUser: ClubUser = {
+        id: 1,
+        email: 'boss@club.cz',
+        name: 'Admin',
+        role: 'admin'
+      }
+      mockGetUserSession.mockResolvedValueOnce({ user: adminUser })
+
+      const result = await requireAdminAuth(dummyEvent)
+      expect(result).toEqual(adminUser)
+    })
+
+    it('allows access for editor role in default adminRoles', async () => {
+      const editorUser: ClubUser = {
+        id: 2,
+        email: 'editor@club.cz',
+        name: 'Editor',
+        role: 'editor' as AppRole
+      }
+      mockGetUserSession.mockResolvedValueOnce({ user: editorUser })
+
+      const result = await requireAdminAuth(dummyEvent)
+      expect(result).toEqual(editorUser)
+    })
+
+    it('allows access for user on allowedEmails whitelist even with user role', async () => {
+      const whitelistedUser: ClubUser = {
+        id: 3,
+        email: 'special@club.cz',
+        name: 'Whitelisted User',
+        role: 'user'
+      }
+      mockGetUserSession.mockResolvedValueOnce({ user: whitelistedUser })
+
+      const result = await requireAdminAuth(dummyEvent)
+      expect(result).toEqual(whitelistedUser)
+    })
+
+    it('throws 403 Forbidden when user is not admin and not in allowedEmails', async () => {
+      const normalUser: ClubUser = {
+        id: 4,
+        email: 'nobody@club.cz',
+        name: 'Normal User',
+        role: 'user'
+      }
+      mockGetUserSession.mockResolvedValueOnce({ user: normalUser })
+
+      await expect(requireAdminAuth(dummyEvent)).rejects.toMatchObject({
+        statusCode: 403
       })
     })
   })

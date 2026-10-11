@@ -288,6 +288,8 @@ declare module 'nitropack' {
         name: string
         avatar?: string
         providerId?: string
+        allowRegistration?: boolean
+        defaultRole?: string
       },
       result: { user: ClubUser | null }
     ) => void | Promise<void>
@@ -437,8 +439,17 @@ declare module 'vue-router' {
 }
 
 declare module 'nuxt/schema' {
+  interface RuntimeConfig {
+    clubAuth?: {
+      allowRegistration?: boolean
+      allowedEmails?: string[]
+      defaultRole?: AppRole
+      adminRoles?: string[]
+    }
+  }
   interface PublicRuntimeConfig {
     clubAuth?: {
+      allowRegistration?: boolean
       loginPath?: string
       registerPath?: string
       defaultRedirect?: string
@@ -448,8 +459,17 @@ declare module 'nuxt/schema' {
 }
 
 declare module '@nuxt/schema' {
+  interface RuntimeConfig {
+    clubAuth?: {
+      allowRegistration?: boolean
+      allowedEmails?: string[]
+      defaultRole?: AppRole
+      adminRoles?: string[]
+    }
+  }
   interface PublicRuntimeConfig {
     clubAuth?: {
+      allowRegistration?: boolean
       loginPath?: string
       registerPath?: string
       defaultRedirect?: string

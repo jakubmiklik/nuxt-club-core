@@ -1,4 +1,5 @@
 import type { H3Event } from 'h3'
+import { createError } from 'h3'
 import type { AppRole, ClubUser, AuthDatabaseUser, ClubMemberProfile, ClubSeason, ClubBranch, ClubInvitation } from '../../types/auth'
 import { createClubError } from './errors'
 
@@ -48,6 +49,56 @@ export async function requireRole(
       statusCode: 403,
       code: 'FORBIDDEN',
       message: `Nedostatečná oprávnění. Vyžadována role: ${roles.join(' nebo ')}, vaše role: ${String(user.role)}.`
+    })
+  }
+
+  return user
+}
+
+/**
+ * Ověří, zda má přihlášený uživatel administrátorská oprávnění.
+ * Kontroluje session uživatele:
+ * 1. Zda session?.user existuje.
+ * 2. Zda má roli z adminRoles (výchozí ['admin', 'editor']).
+ * 3. Nebo zda je e-mail na whitelistu allowedEmails z runtimeConfig.clubAuth.
+ * Pokud podmínky nejsou splněny, vyvolá standardní 403 Forbidden.
+ */
+export async function requireAdminAuth(event: H3Event): Promise<ClubUser> {
+  const session = await getUserSession(event)
+  const user = session?.user as ClubUser | undefined
+
+  if (!user) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Forbidden',
+      message: 'Pro přístup k této akci musíte mít administrátorská oprávnění.'
+    })
+  }
+
+  const config = useRuntimeConfig()
+  const clubAuthConfig = config.clubAuth as {
+    adminRoles?: string[]
+    allowedEmails?: string[]
+  } | undefined
+
+  const adminRoles: string[] =
+    clubAuthConfig?.adminRoles && clubAuthConfig.adminRoles.length > 0
+      ? clubAuthConfig.adminRoles
+      : ['admin', 'editor']
+
+  const allowedEmails: string[] = (clubAuthConfig?.allowedEmails || []).map((e: string) =>
+    e.toLowerCase().trim()
+  )
+
+  const userEmail = (user.email || '').toLowerCase().trim()
+  const hasAdminRole = user.role === 'admin' || adminRoles.includes(user.role)
+  const isEmailAllowed = Boolean(userEmail && allowedEmails.includes(userEmail))
+
+  if (!hasAdminRole && !isEmailAllowed) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Forbidden',
+      message: 'Přístup odepřen. Nemáte administrátorská oprávnění.'
     })
   }
 
@@ -120,17 +171,41 @@ export async function findOrCreateOAuthUser(data: {
   name: string
   avatar?: string
   providerId?: string
-}): Promise<ClubUser> {
+}): Promise<ClubUser | null> {
+  const config = useRuntimeConfig()
+  const clubAuthConfig = config.clubAuth as {
+    allowRegistration?: boolean
+    allowedEmails?: string[]
+    defaultRole?: AppRole
+    adminRoles?: string[]
+  } | undefined
+
+  const email = data.email.toLowerCase().trim()
+  const allowedEmails: string[] = (clubAuthConfig?.allowedEmails || []).map((e: string) =>
+    e.toLowerCase().trim()
+  )
+  const isWhitelisted = allowedEmails.includes(email)
+  const allowRegistration = isWhitelisted || Boolean(clubAuthConfig?.allowRegistration)
+  const defaultRole = (clubAuthConfig?.defaultRole || 'user') as AppRole
+
   const nitroApp = useNitroApp()
   const result: { user: ClubUser | null } = { user: null }
 
-  await nitroApp.hooks.callHook('auth:find-or-create-oauth-user', data, result)
+  await nitroApp.hooks.callHook(
+    'auth:find-or-create-oauth-user',
+    {
+      ...data,
+      allowRegistration,
+      defaultRole
+    },
+    result
+  )
 
   if (result.user) {
     return result.user
   }
 
-  // Fallback: Pokud hostitelská aplikace nemá specifický OAuth hook,
+  // Fallback: Pokud hostitelská aplikace nemá specifický OAuth hook nebo uživatele nevytvořila,
   // zkusíme najít uživatele podle e-mailu:
   const existingUser = await findUserByEmail(data.email)
   if (existingUser) {
@@ -143,13 +218,18 @@ export async function findOrCreateOAuthUser(data: {
     }
   }
 
-  // Pokud neexistuje, zkusíme vytvořit uživatele s náhodným heslem a výchozí rolí 'user'
+  // Pokud uživatel neexistuje a registrace není povolena, bezpečně vrátit null
+  if (!allowRegistration) {
+    return null
+  }
+
+  // Pokud neexistuje a registrace je povolena, vytvoříme uživatele s náhodným heslem a výchozí rolí
   const randomPasswordHash = await hashUserPassword(crypto.randomUUID())
   return await createUser({
     email: data.email,
     name: data.name,
     passwordHash: randomPasswordHash,
-    role: 'user'
+    role: defaultRole
   })
 }
 

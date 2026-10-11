@@ -20,6 +20,11 @@ export default defineOAuthGoogleEventHandler({
       providerId: googleUser.sub
     })
 
+    if (!user) {
+      deleteCookie(event, 'auth_redirect')
+      return sendRedirect(event, '/login?error=account_not_allowed')
+    }
+
     // 2. Načteme profily členů a určíme výchozí aktivní profil
     const members = await getUserMembers(user.id)
     const primaryMember = members.find((m) => m.isPrimary) || members[0]
@@ -41,7 +46,7 @@ export default defineOAuthGoogleEventHandler({
       loggedInAt: Date.now()
     })
 
-    // 3. Zjistíme, kam má být uživatel přesměrován (např. z cookie auth_redirect)
+    // 4. Zjistíme, kam má být uživatel přesměrován (např. z cookie auth_redirect)
     const redirectCookie = getCookie(event, 'auth_redirect')
     const destination = redirectCookie && redirectCookie.startsWith('/') ? redirectCookie : '/'
 
@@ -53,6 +58,7 @@ export default defineOAuthGoogleEventHandler({
 
   onError(event, error) {
     console.error('[nuxt-club-core] Chyba při Google OAuth autentizaci:', error)
+    deleteCookie(event, 'auth_redirect')
     return sendRedirect(event, '/login?error=google_auth_failed')
   }
 })

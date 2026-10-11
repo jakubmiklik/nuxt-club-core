@@ -11,6 +11,7 @@ const props = withDefaults(
     subtitle?: string
     registerUrl?: string
     forgotPasswordUrl?: string
+    allowRegistration?: boolean
   }>(),
   {
     redirectTo: '/',
@@ -19,7 +20,8 @@ const props = withDefaults(
     title: 'Vítejte zpět',
     subtitle: 'Přihlaste se do klubového informačního systému',
     registerUrl: '/register',
-    forgotPasswordUrl: '/forgot-password'
+    forgotPasswordUrl: '/forgot-password',
+    allowRegistration: undefined
   }
 )
 
@@ -27,6 +29,16 @@ const emit = defineEmits<{
   (e: 'success', user: ClubUser): void
   (e: 'error', error: Error): void
 }>()
+
+const route = useRoute()
+const config = useRuntimeConfig()
+
+const isRegistrationAllowed = computed(() => {
+  if (props.allowRegistration !== undefined) {
+    return props.allowRegistration
+  }
+  return config.public?.clubAuth?.allowRegistration ?? false
+})
 
 const { fetch: refreshSession } = useUserSession()
 
@@ -38,6 +50,17 @@ const form = reactive({
 const showPassword = ref(false)
 const isLoading = ref(false)
 const errorMessage = ref<string | null>(null)
+
+watchEffect(() => {
+  const errorParam = route.query.error
+  if (errorParam === 'account_not_allowed' || errorParam === 'registration_disabled') {
+    errorMessage.value = 'Tento účet nemá oprávnění k přístupu. Registrace nových účtů není v tomto systému povolena.'
+  } else if (errorParam === 'google_auth_failed') {
+    errorMessage.value = 'Přihlášení přes Google účet se nezdařilo.'
+  } else if (errorParam === 'seznam_auth_failed') {
+    errorMessage.value = 'Přihlášení přes Seznam účet se nezdařilo.'
+  }
+})
 
 async function handleLogin() {
   if (isLoading.value) return
@@ -251,7 +274,7 @@ async function handleLogin() {
       </template>
 
       <!-- Odkaz na registraci -->
-      <p v-if="registerUrl" class="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
+      <p v-if="registerUrl && isRegistrationAllowed" class="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
         Ještě nemáte účet?
         <NuxtLink
           :to="registerUrl"
