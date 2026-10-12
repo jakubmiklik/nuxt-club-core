@@ -290,6 +290,7 @@ declare module 'nitropack' {
         providerId?: string
         allowRegistration?: boolean
         defaultRole?: string
+        isWhitelisted?: boolean
       },
       result: { user: ClubUser | null }
     ) => void | Promise<void>

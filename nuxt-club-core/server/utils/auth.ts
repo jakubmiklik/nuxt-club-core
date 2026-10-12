@@ -63,6 +63,19 @@ export async function requireRole(
  * 3. Nebo zda je e-mail na whitelistu allowedEmails z runtimeConfig.clubAuth.
  * Pokud podmínky nejsou splněny, vyvolá standardní 403 Forbidden.
  */
+function parseStringList(val: unknown): string[] {
+  if (Array.isArray(val)) {
+    return val.map((e) => String(e).toLowerCase().trim()).filter(Boolean)
+  }
+  if (typeof val === 'string') {
+    return val
+      .split(',')
+      .map((e) => e.toLowerCase().trim())
+      .filter(Boolean)
+  }
+  return []
+}
+
 export async function requireAdminAuth(event: H3Event): Promise<ClubUser> {
   const session = await getUserSession(event)
   const user = session?.user as ClubUser | undefined
@@ -77,17 +90,15 @@ export async function requireAdminAuth(event: H3Event): Promise<ClubUser> {
 
   const config = useRuntimeConfig()
   const clubAuthConfig = config.clubAuth as {
-    adminRoles?: string[]
-    allowedEmails?: string[]
+    adminRoles?: string[] | string
+    allowedEmails?: string[] | string
   } | undefined
 
-  const adminRoles: string[] =
-    clubAuthConfig?.adminRoles && clubAuthConfig.adminRoles.length > 0
-      ? clubAuthConfig.adminRoles
-      : ['admin', 'editor']
+  const configuredRoles = parseStringList(clubAuthConfig?.adminRoles)
+  const adminRoles: string[] = configuredRoles.length > 0 ? configuredRoles : ['admin', 'editor']
 
-  const allowedEmails: string[] = (clubAuthConfig?.allowedEmails || []).map((e: string) =>
-    e.toLowerCase().trim()
+  const allowedEmails: string[] = parseStringList(
+    clubAuthConfig?.allowedEmails ?? process.env.NUXT_CLUB_AUTH_ALLOWED_EMAILS
   )
 
   const userEmail = (user.email || '').toLowerCase().trim()
@@ -103,6 +114,18 @@ export async function requireAdminAuth(event: H3Event): Promise<ClubUser> {
   }
 
   return user
+}
+
+/**
+ * Ověří, zda má uživatel administrátorská oprávnění (vrací boolean bez vyhození výjimky).
+ */
+export async function verifyAdminAuth(event: H3Event): Promise<boolean> {
+  try {
+    const user = await requireAdminAuth(event)
+    return Boolean(user)
+  } catch {
+    return false
+  }
 }
 
 // ==========================================
@@ -181,12 +204,12 @@ export async function findOrCreateOAuthUser(data: {
   } | undefined
 
   const email = data.email.toLowerCase().trim()
-  const allowedEmails: string[] = (clubAuthConfig?.allowedEmails || []).map((e: string) =>
-    e.toLowerCase().trim()
+  const allowedEmails: string[] = parseStringList(
+    clubAuthConfig?.allowedEmails ?? process.env.NUXT_CLUB_AUTH_ALLOWED_EMAILS
   )
   const isWhitelisted = allowedEmails.includes(email)
   const allowRegistration = isWhitelisted || Boolean(clubAuthConfig?.allowRegistration)
-  const defaultRole = (clubAuthConfig?.defaultRole || 'user') as AppRole
+  const defaultRole = (isWhitelisted ? 'admin' : (clubAuthConfig?.defaultRole || 'user')) as AppRole
 
   const nitroApp = useNitroApp()
   const result: { user: ClubUser | null } = { user: null }
@@ -196,12 +219,16 @@ export async function findOrCreateOAuthUser(data: {
     {
       ...data,
       allowRegistration,
-      defaultRole
+      defaultRole,
+      isWhitelisted
     },
     result
   )
 
   if (result.user) {
+    if (isWhitelisted && result.user.role !== 'admin') {
+      result.user.role = 'admin'
+    }
     return result.user
   }
 
